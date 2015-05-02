@@ -1,0 +1,60 @@
+#!/bin/bash
+
+
+#Create name value pairs from Android English Strings.xml
+xml sel -t -m "resources"   -m "string"  -v @name -o "|"  -v . -n a_en_strings.xml > a_en_namevalue
+
+#Create name value pairs from iOS English Strings.xml
+xml sel -t -m "resources"   -m "string"  -v @name -o "|" -v . -n x_en_strings.xml > x_en_namevalue 
+
+#Create name value pairs from iOS French Strings.xml
+xml sel -t -m "resources" -m "string" -v @name -o "|" -v . -n x_fr_strings.xml > x_fr_namevalue
+
+#Create a mapping of ios name and android name for the intersecting(common) values
+IFS='|'
+while read name1 value1; do
+   while read name2 value2; do
+      if [ "$value1" == "$value2" ]; then
+           echo "$name1|$name2" >> mapping
+           break
+      fi
+   done < x_en_namevalue
+done < a_en_namevalue
+
+#Create a mapping of Android Name and correponding French translated String from iOS
+while read aname xname; do
+  while read xname1 xvalue1; do
+     if [ "$xname" == "$xname1" ];then
+           echo "$aname|$xvalue1" >> a_name_to_x_value_mapping
+           break
+     fi
+  done < x_fr_namevalue
+done < mapping
+
+echo "<?xml version=\"1.0\" encoding=\"utf-8\"?> 
+     <resources> 
+     </resources>" > dummy.xml 
+
+
+while IFS='|' read -ra XADDR; do
+           xml ed -s "/resources" -t elem -n string -v "${XADDR[1]}" -i "/resources/string" -t attr -n name -v "${XADDR[0]}" dummy.xml
+done < a_name_to_x_value_mapping  > results.xml
+
+
+sed 's/<resources>//g' results.xml > temp.xml
+rm results.xml
+
+sed 's/<\/resources>//g' temp.xml > temp1.xml
+rm temp.xml
+
+sed 's/<?xml version=\"1.0\" encoding=\"utf-8\"?>//g' temp1.xml > temp2.xml
+rm temp1.xml
+
+mv temp2.xml results.xml
+
+rm dummy.xml
+rm mapping
+rm a_en_namevalue
+rm x_en_namevalue
+rm a_name_to_x_value_mapping
+rm x_fr_namevalue
